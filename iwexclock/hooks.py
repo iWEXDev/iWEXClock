@@ -5,6 +5,16 @@ app_description = "Employee Time Tracking and Productivity Monitoring System"
 app_email = "support@iwex.in"
 app_license = "mit"
 
+
+
+
+doc_events = {
+    "iWEXClock Data": {
+        "before_insert": "iwexclock.utils.decrypt_iwexclock_fields",
+        "before_validate": "iwexclock.utils.decrypt_iwexclock_fields",
+        "before_save": "iwexclock.utils.decrypt_iwexclock_fields"
+    }
+}
 # Apps
 # ------------------
 
