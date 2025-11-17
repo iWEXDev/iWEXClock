@@ -15,6 +15,32 @@ doc_events = {
         "before_save": "iwexclock.utils.decrypt_iwexclock_fields"
     }
 }
+fixtures = [
+    {
+        "doctype": "Server Script",
+        "filters": [
+            ["name", "in", [
+                "Next_alert Scheduler",
+                "iWEXClock Reminder next_alert",
+                "iWEXClock Reminder ID"
+            ]]
+        ]
+    },
+    {
+        "doctype": "Client Script",
+        "filters": [
+            ["name", "in", [
+                "iWEXClock Reminder Sound",
+                "iWEXClock Reminder Volume",
+                "iWEXClock Settings Volume",
+                "iWEXClock Reminder settings button",
+                "iWEXClock Reminder Start Time",
+                "iWEXClock Reminder Title"
+            ]]
+        ]
+    }
+]
+
 # Apps
 # ------------------
 

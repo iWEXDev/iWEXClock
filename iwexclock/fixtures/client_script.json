@@ -1,0 +1,68 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "iWEXClock Reminder",
+  "enabled": 1,
+  "modified": "2025-11-17 10:40:21.010395",
+  "module": "iWEXClock",
+  "name": "iWEXClock Reminder Sound",
+  "script": "frappe.ui.form.on('iWEXClock Reminder', {\n    onload: function(frm) {\n        if (frm.is_new()) {  // only when creating a new Reminder\n            frappe.db.get_value('iWEXClock Reminder Settings',\n                { user: frappe.session.user },\n                ['notification_sound', 'volume']\n            ).then(r => {\n                if (r && r.message) {\n                    // If user has settings → use them\n                    if (r.message.notification_sound) {\n                        frm.set_value('notification_sound', r.message.notification_sound);\n                    } else {\n                        frm.set_value('notification_sound', \"Default\");\n                    }\n\n                    if (r.message.volume) {\n                        frm.set_value('volume', r.message.volume);\n                    } else {\n                        frm.set_value('volume', 50);\n                    }\n                } else {\n                    // No Reminder Settings found for this user → use defaults\n                    frm.set_value('notification_sound', \"Default\");\n                    frm.set_value('volume', 50);\n                }\n            });\n        }\n    }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "iWEXClock Reminder",
+  "enabled": 1,
+  "modified": "2025-11-17 10:41:35.842623",
+  "module": "iWEXClock",
+  "name": "iWEXClock Reminder Volume",
+  "script": "frappe.ui.form.on('iWEXClock Reminder', {\n\tvalidate: function(frm) {\n        if (frm.doc.volume < 1 || frm.doc.volume > 100) {\n            frappe.throw(__(\"Volume must be between 1 and 100\"));\n        }\n    }\n});",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "iWEXClock Reminder Settings",
+  "enabled": 1,
+  "modified": "2025-11-17 10:42:43.787702",
+  "module": "iWEXClock",
+  "name": "iWEXClock Settings Volume",
+  "script": "frappe.ui.form.on('iWEXClock Reminder Settings', {\n\t\tvalidate: function(frm) {\n        if (frm.doc.volume < 1 || frm.doc.volume > 100) {\n            frappe.throw(__(\"Volume must be between 1 and 100\"));\n        }\n    }\n});",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "iWEXClock Reminder",
+  "enabled": 1,
+  "modified": "2025-11-17 10:44:01.282267",
+  "module": "iWEXClock",
+  "name": "iWEXClock Reminder settings button",
+  "script": "frappe.ui.form.on('iWEXClock Reminder', {\n\trefresh(frm) {\n\tfrm.add_custom_button(\"Reminder Settings\", () => {\n            frappe.set_route(\"List\", \"iWEXClock Reminder Settings\");\n        });\n\t}\n})",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "iWEXClock Reminder",
+  "enabled": 1,
+  "modified": "2025-11-17 10:45:10.575389",
+  "module": "iWEXClock",
+  "name": "iWEXClock Reminder Start Time",
+  "script": "frappe.ui.form.on('iWEXClock Reminder', {\n    onload: function(frm) {\n        update_start_time(frm);\n    },\n    start_time: function(frm) {\n        update_start_time(frm);\n    },\n    disable_rounding: function(frm) {\n        frm.set_value('start_time', '');\n    }\n       \n});\n\nfunction update_start_time(frm){\n    if (!frm.doc.start_time) return;\n     if (frm.doc.disable_rounding == 1) {\n         \n            return;\n        } \n        \n            let parts = frm.doc.start_time.split(\":\");\n            let hours = parseInt(parts[0]);\n            let minutes = parseInt(parts[1]);\n            let seconds = parseInt(parts[2] || \"0\");\n\n            if (minutes < 15) {\n                minutes = 0;\n            } else if (minutes < 45) {\n                minutes = 30;\n            } else {\n                minutes = 0;\n                hours++;\n                if (hours == 24) hours = 0; // wrap around midnight\n            }\n\n            let hh = String(hours).padStart(2, '0');\n            let mm = String(minutes).padStart(2, '0');\n            let ss = \"00\";\n\n            // This will update it on the form immediately\n            frm.set_value('start_time', `${hh}:${mm}:${ss}`);\n        }\n    \n\n    \n\n\n\t",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "iWEXClock Reminder",
+  "enabled": 1,
+  "modified": "2025-11-17 10:46:27.104759",
+  "module": "iWEXClock",
+  "name": "iWEXClock Reminder Title",
+  "script": "// Client Script for iWEXClock Reminder DocType\n// This script automatically updates the Title field by concatenating\n// sub_type and frequency values when either field changes\n\nfrappe.ui.form.on('iWEXClock Reminder', {\n    // Trigger when sub_type field changes\n    sub_type: function(frm) {\n        update_title(frm);\n    },\n    \n    // Trigger when frequency field changes\n    frequency: function(frm) {\n        update_title(frm);\n    }\n});\n\n// Function to concatenate sub_type and frequency into title\nfunction update_title(frm) {\n    let sub_type = frm.doc.sub_type || '';\n    let frequency = frm.doc.frequency || '';\n    \n    \n    // Only concatenate if both fields have values\n    if (sub_type && frequency) {\n        let title = sub_type + ' - ' + frequency;\n        frm.set_value('title', title);\n    } else if (sub_type) {\n        // If only sub_type is set, use just that\n        frm.set_value('title', sub_type);\n    } else if (frequency) {\n        // If only frequency is set, use just that\n        frm.set_value('title', frequency);\n    } else {\n        // If both are empty, clear the title\n        frm.set_value('title', '');\n    }\n}",
+  "view": "Form"
+ }
+]
