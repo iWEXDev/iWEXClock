@@ -41,6 +41,8 @@ fixtures = [
     }
 ]
 
+
+after_install = "iwexclock.install.after_install"
 # Apps
 # ------------------
 

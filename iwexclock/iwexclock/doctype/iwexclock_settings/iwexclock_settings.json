@@ -1,0 +1,120 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-12-05 11:41:57.099119",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "auto_delete_reminder",
+  "key",
+  "column_break_kwsb",
+  "delete_all_reminders",
+  "create_bot",
+  "create_key",
+  "section_break_nexf",
+  "bot_user",
+  "column_break_osbx",
+  "bot_api_key",
+  "column_break_qzgm",
+  "bot_api_secret"
+ ],
+ "fields": [
+  {
+   "default": "90",
+   "fieldname": "auto_delete_reminder",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Auto Delete Reminder (Days)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_kwsb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "This will delete all reminders owner by the iWEXClock Bot.",
+   "fieldname": "delete_all_reminders",
+   "fieldtype": "Button",
+   "label": "Delete All Reminders Now"
+  },
+  {
+   "fieldname": "create_bot",
+   "fieldtype": "Button",
+   "label": "Create Bot"
+  },
+  {
+   "fieldname": "create_key",
+   "fieldtype": "Button",
+   "label": "Create Key"
+  },
+  {
+   "fieldname": "section_break_nexf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "bot_user",
+   "fieldtype": "Data",
+   "label": "Bot User",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "column_break_osbx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bot_api_key",
+   "fieldtype": "Data",
+   "label": "Bot API Key",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "column_break_qzgm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bot_api_secret",
+   "fieldtype": "Data",
+   "label": "Bot API Secret",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "key",
+   "fieldtype": "Data",
+   "label": "Key",
+   "permlevel": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-12-08 17:37:27.769195",
+ "modified_by": "Administrator",
+ "module": "iWEXClock",
+ "name": "iWEXClock Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "permlevel": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
