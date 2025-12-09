@@ -10,30 +10,57 @@ import json
 
 class iWEXClockSettings(Document):
     pass
+
+def check_system_manager_permission():
+    """
+    Check if current user is System Manager
+    Raises PermissionError if not authorized
+    """
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(
+            _("Only System Managers can perform this action"),
+            frappe.PermissionError
+        )
+    
+    if not frappe.has_permission("iWEXClock Settings", "write"):
+        frappe.throw(
+            _("You do not have permission to modify iWEXClock Settings"),
+            frappe.PermissionError
+        )
+
 @frappe.whitelist()
 def create_encryption_key():
     """
-    Simplified version that avoids reading password field after setting
+    Generate Fernet encryption key
+    
+    Security:
+    - Only System Managers can execute
+    - Keys stored in site_config.json (site-specific)
+    - Atomic file operations
+    - Proper file permissions
     """
+    # Check permissions
+    check_system_manager_permission()
+    
     try:
         from cryptography.fernet import Fernet
         
         messages = []
         
-        # Get site config path
+        # Get site-specific config path
         site_config_path = get_site_config_path()
         
-        # Check site_config.json ONLY
+        # Check existing key in site_config
         site_config_key = get_key_from_site_config(site_config_path)
         
         if site_config_key:
-            # Key already exists in site_config
+            # Key already exists
             messages.append({
                 "type": "info",
                 "message": _("ℹ️ Encryption key already exists in site_config.json")
             })
             
-            # Sync to doctype (overwrite whatever is there)
+            # Sync to doctype
             settings = frappe.get_single("iWEXClock Settings")
             settings.key = site_config_key
             settings.save(ignore_permissions=True)
@@ -48,10 +75,10 @@ def create_encryption_key():
             key_generated = False
             
         else:
-            # No key exists - generate new
+            # Generate new key
             new_key = Fernet.generate_key().decode('utf-8')
             
-            # Save to site_config
+            # Save to site_config (atomic operation)
             save_key_to_site_config(site_config_path, new_key)
             messages.append({
                 "type": "success",
@@ -76,8 +103,11 @@ def create_encryption_key():
             final_key = new_key
             key_generated = True
         
-        # Use the key we already have (don't read from anywhere)
-        masked_key = mask_key(final_key)
+        # Log the action
+        frappe.log_error(
+            title="Encryption Key Action",
+            message=f"Action: {'Generated' if key_generated else 'Synced'}\nUser: {frappe.session.user}\nSite: {frappe.local.site}"
+        )
         
         return {
             "success": True,
@@ -85,7 +115,7 @@ def create_encryption_key():
             "details": messages,
             "data": {
                 "key_generated": key_generated,
-                "masked_key": masked_key,
+                "masked_key": mask_key(final_key),
                 "key_length": len(final_key)
             }
         }
@@ -102,11 +132,8 @@ def create_encryption_key():
             "message": _("Failed to create encryption key: {0}").format(str(e)),
             "details": []
         }
-def get_site_config_path():
-    """Get the path to site_config.json"""
-    site_path = frappe.get_site_path()
-    site_config_path = os.path.join(site_path, "site_config.json")
-    return site_config_path
+
+
 
 
 def get_key_from_doctype(settings):
@@ -127,93 +154,127 @@ def get_key_from_doctype(settings):
         return None
 
 
+def mask_api_key(api_key):
+    """Mask API key for security"""
+    if not api_key or len(api_key) < 16:
+        return "****"
+    return f"{api_key[:8]}...{api_key[-4:]}"
+
+
+def mask_key(key):
+    """Mask encryption key for display"""
+    if not key or len(key) < 16:
+        return "****"
+    return f"{key[:8]}...{key[-8:]}"
+
+
+def get_site_config_path():
+    """Get site-specific config path"""
+    site_path = frappe.get_site_path()
+    return os.path.join(site_path, "site_config.json")
+
+
 def get_key_from_site_config(site_config_path):
-    """
-    Read encryption_key from site_config.json
-    """
+    """Read encryption key from site_config.json"""
     try:
         if os.path.exists(site_config_path):
             with open(site_config_path, 'r') as f:
                 site_config = json.load(f)
-                key = site_config.get("encryption_key")
-                return key if key else None
+                return site_config.get("encryption_key")
     except Exception as e:
         frappe.log_error(
             title="Error Reading site_config.json",
-            message=f"Could not read site_config.json: {str(e)}"
+            message=f"Path: {site_config_path}\nError: {str(e)}"
         )
     return None
 
 
 def save_key_to_site_config(site_config_path, key):
     """
-    Save encryption_key to site_config.json
+    Save encryption key to site_config.json with atomic operation
     """
     try:
+        # Check write permissions
+        site_dir = os.path.dirname(site_config_path)
+        if not os.access(site_dir, os.W_OK):
+            frappe.throw(_("Insufficient permissions to write to site configuration"))
+        
+        # Read existing config
         site_config = {}
         if os.path.exists(site_config_path):
             with open(site_config_path, 'r') as f:
                 site_config = json.load(f)
         
+        # Update key
         site_config["encryption_key"] = key
         
-        with open(site_config_path, 'w') as f:
+        # Atomic write (temp file + rename)
+        temp_path = site_config_path + ".tmp"
+        with open(temp_path, 'w') as f:
             json.dump(site_config, f, indent=4)
         
+        # Atomic rename
+        os.replace(temp_path, site_config_path)
+        
+        # Set secure permissions (owner read/write only)
+        os.chmod(site_config_path, 0o600)
+        
     except Exception as e:
-        frappe.throw(_("Failed to save encryption key to site_config.json: {0}").format(str(e)))
-
-
-def mask_key(key):
-    """
-    Mask the key for display
-    """
-    if not key or len(key) < 16:
-        return "****"
-    return f"{key[:8]}...{key[-8:]}"
+        frappe.log_error(
+            title="Failed to Save Encryption Key",
+            message=f"Path: {site_config_path}\nError: {str(e)}"
+        )
+        frappe.throw(_("Failed to save encryption key: {0}").format(str(e)))
 
 @frappe.whitelist()
 def create_bot_user():
     """
-    Create or update iWEXClock Bot user with intelligent API credential handling.
-    - Only generates new API keys if they don't exist
-    - Syncs existing keys to Settings if they differ
-    - Provides detailed status messages for each step
+    Create or update iWEXClock Bot user with API credentials
     """
+    # Check permissions
+    check_system_manager_permission()
+    
+    # # Rate limiting - DISABLED FOR NOW
+    # cache_key = f"bot_creation_{frappe.session.user}"
+    # if frappe.cache().get_value(cache_key):
+    #     frappe.throw(_("Please wait before creating bot user again"))
+    
     try:
-        messages = []  # Store all status messages
+        messages = []
         
         # Configuration
         role_name = "iWEXClock Bot"
         bot_email = "clock@iwex.in"
         bot_full_name = "iWEXClock Bot"
         
-        # Step A: Handle Role Creation
+        # Handle Role
         handle_role_creation(role_name, messages)
         
-        # Step B: Assign Permissions to Role
+        # Assign Permissions
         assign_role_permissions(role_name, messages)
         
-        # Step C: Handle User Creation
+        # Handle User
         user, user_created = handle_user_creation(bot_email, bot_full_name, role_name, messages)
         
-        # Step D: Handle API Credentials (SMART LOGIC)
+        # Handle API Credentials
         api_key, api_secret = handle_api_credentials_smart(user, messages)
         
-        # Step E: Sync Settings with User's API Keys
+        # Sync Settings
         sync_settings_with_api_keys(bot_email, api_key, api_secret, messages)
         
-        # Commit all changes
+        # Commit
         frappe.db.commit()
         
-        # Return success response
+        # # Set rate limit - DISABLED
+        # frappe.cache().set_value(cache_key, "1", expires_in_sec=3600)
+        
         return {
             "success": True,
             "message": _("Bot user setup completed successfully"),
             "details": messages,
             "data": {
                 "username": bot_email,
-                "api_key": api_key,
+                "api_key": mask_api_key(api_key),
                 "role": role_name
             }
         }
@@ -230,8 +291,6 @@ def create_bot_user():
             "message": _("Failed to create bot user: {0}").format(str(e)),
             "details": []
         }
-
-
 def handle_role_creation(role_name, messages):
     """
     Create role if it doesn't exist, skip if it does.
