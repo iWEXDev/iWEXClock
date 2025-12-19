@@ -1,0 +1,54 @@
+{
+ "actions": [],
+ "creation": "2025-12-16 18:10:04.679100",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "total_employees",
+  "column_break_jxar",
+  "billing_address"
+ ],
+ "fields": [
+  {
+   "description": "Company name",
+   "fieldname": "company",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Company",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Number of employees in this company",
+   "fieldname": "total_employees",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Total Employees"
+  },
+  {
+   "description": "Billing address for this company",
+   "fieldname": "billing_address",
+   "fieldtype": "Small Text",
+   "label": "Billing Address"
+  },
+  {
+   "fieldname": "column_break_jxar",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2025-12-17 15:14:11.469810",
+ "modified_by": "Administrator",
+ "module": "iWEXClock",
+ "name": "List of Companies",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

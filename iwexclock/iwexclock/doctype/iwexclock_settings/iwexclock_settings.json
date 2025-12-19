@@ -5,12 +5,36 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "section_company_info",
+  "company_name",
+  "frappe_hr_installed",
+  "total_employees",
+  "column_break_basic",
+  "company_address",
+  "section_admin_details",
+  "admin_user_id",
+  "admin_full_name",
+  "column_break_admin",
+  "admin_email_id",
+  "primary_contact_number",
+  "section_domain",
+  "domain_name",
+  "section_multi_company",
+  "companies",
+  "section_users",
+  "users",
+  "section_registration",
+  "column_break_registration",
+  "registration_date",
+  "customer_id",
   "auto_delete_reminder",
   "key",
   "column_break_kwsb",
   "delete_all_reminders",
-  "create_bot",
-  "create_key",
+  "setup_bot_and_keys",
+  "column_break_bggp",
+  "iwexclock_id",
+  "registration_status",
   "section_break_nexf",
   "bot_user",
   "column_break_osbx",
@@ -19,6 +43,162 @@
   "bot_api_secret"
  ],
  "fields": [
+  {
+   "fieldname": "section_company_info",
+   "fieldtype": "Section Break",
+   "label": "Company Information"
+  },
+  {
+   "description": "Enter your company's legal name",
+   "fieldname": "company_name",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company Name",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "description": "Full business address",
+   "fieldname": "company_address",
+   "fieldtype": "Small Text",
+   "label": "Company Address"
+  },
+  {
+   "description": "Format: +91XXXXXXXXXX",
+   "fieldname": "primary_contact_number",
+   "fieldtype": "Data",
+   "label": "Primary Contact Number",
+   "options": "Phone",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "depends_on": "frappe_hr_installed",
+   "description": "Auto-calculated from companies table",
+   "fieldname": "total_employees",
+   "fieldtype": "Int",
+   "label": "Total Employees",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Auto-detected by system",
+   "fieldname": "frappe_hr_installed",
+   "fieldtype": "Check",
+   "label": "Frappe HR Installed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_admin_details",
+   "fieldtype": "Section Break",
+   "label": "Administrator Details"
+  },
+  {
+   "description": "ERPNext user ID (used for login)",
+   "fieldname": "admin_user_id",
+   "fieldtype": "Link",
+   "label": "Admin User ID",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "description": "Full name of the administrator",
+   "fetch_from": "admin_user_id.full_name",
+   "fieldname": "admin_full_name",
+   "fieldtype": "Data",
+   "label": "Admin Full Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_admin",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Email for communication (can be different from User ID)",
+   "fieldname": "admin_email_id",
+   "fieldtype": "Data",
+   "label": "Admin Email ID",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_domain",
+   "fieldtype": "Section Break",
+   "label": "Domain Configuration"
+  },
+  {
+   "description": "Your subdomain (e.g., acme.iwexclock.com)",
+   "fieldname": "domain_name",
+   "fieldtype": "Data",
+   "label": "Domain Name",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_multi_company",
+   "fieldtype": "Section Break",
+   "label": "Multi-Company Setup"
+  },
+  {
+   "description": "List all companies under this account",
+   "fieldname": "companies",
+   "fieldtype": "Table",
+   "label": "Companies",
+   "options": "List of Companies"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_users",
+   "fieldtype": "Section Break",
+   "label": "User Configuration"
+  },
+  {
+   "description": "List all users who will use iWEXClock",
+   "fieldname": "users",
+   "fieldtype": "Table",
+   "label": "Users",
+   "options": "List of Users"
+  },
+  {
+   "fieldname": "section_registration",
+   "fieldtype": "Section Break",
+   "label": "Registration Details"
+  },
+  {
+   "description": "Your unique registration ID (filled after successful registration)",
+   "fieldname": "iwexclock_id",
+   "fieldtype": "Data",
+   "label": "iWEXClock ID"
+  },
+  {
+   "default": "Not Registered",
+   "fieldname": "registration_status",
+   "fieldtype": "Select",
+   "label": "Registration Status",
+   "options": "Not Registered\nPending Verification\nRegistered\nLocked",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_registration",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "registration_date",
+   "fieldtype": "Date",
+   "label": "Registration Date",
+   "read_only": 1
+  },
+  {
+   "description": "Customer ID from iwex.in",
+   "fieldname": "customer_id",
+   "fieldtype": "Data",
+   "label": "Customer ID",
+   "read_only": 1
+  },
   {
    "default": "90",
    "fieldname": "auto_delete_reminder",
@@ -38,14 +218,9 @@
    "label": "Delete All Reminders Now"
   },
   {
-   "fieldname": "create_bot",
+   "fieldname": "setup_bot_and_keys",
    "fieldtype": "Button",
-   "label": "Create Bot"
-  },
-  {
-   "fieldname": "create_key",
-   "fieldtype": "Button",
-   "label": "Create Key"
+   "label": "Create Bot & Keys"
   },
   {
    "fieldname": "section_break_nexf",
@@ -82,19 +257,26 @@
    "fieldtype": "Data",
    "label": "Key",
    "permlevel": 1
+  },
+  {
+   "fieldname": "column_break_bggp",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-12-08 17:37:27.769195",
+ "modified": "2025-12-17 15:39:00.224304",
  "modified_by": "Administrator",
  "module": "iWEXClock",
  "name": "iWEXClock Settings",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
+   "create": 1,
+   "delete": 1,
    "email": 1,
    "print": 1,
    "read": 1,

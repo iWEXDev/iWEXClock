@@ -506,3 +506,90 @@ def sync_settings_with_api_keys(username, api_key, api_secret, messages):
         "type": "success",
         "message": _("✅ Settings updated: {0}").format(", ".join(changes))
     })
+
+
+@frappe.whitelist()
+def regenerate_api_keys():
+    """
+    Regenerate ONLY API Key and Secret for existing bot user
+    
+    This method:
+    - DOES regenerate API Key & Secret
+    - Does NOT recreate bot user
+    - Does NOT regenerate encryption key
+    - Does NOT touch role/permissions
+    
+    Safe to call multiple times.
+    """
+    # Check permissions
+    check_system_manager_permission()
+    
+    try:
+        messages = []
+        
+        # Configuration
+        bot_email = "clock@iwex.in"
+        
+        # Verify bot user exists
+        if not frappe.db.exists("User", bot_email):
+            return {
+                "success": False,
+                "message": _("Bot user does not exist. Please create bot first."),
+                "details": []
+            }
+        
+        # Get existing bot user
+        user = frappe.get_doc("User", bot_email)
+        
+        messages.append({
+            "type": "info",
+            "message": _("ℹ️ Using existing bot user: {0}").format(bot_email)
+        })
+        
+        # FORCE regenerate API credentials
+        from frappe.core.doctype.user.user import generate_keys
+        
+        api_key, api_secret = generate_keys(user.name)
+        
+        messages.append({
+            "type": "success",
+            "message": _("✅ API Key & Secret regenerated")
+        })
+        
+        # Sync to Settings
+        settings = frappe.get_single("iWEXClock Settings")
+        settings.bot_api_key = api_key
+        settings.bot_api_secret = api_secret
+        settings.save(ignore_permissions=True)
+        
+        messages.append({
+            "type": "success",
+            "message": _("✅ New credentials saved to Settings")
+        })
+        
+        # Commit
+        frappe.db.commit()
+        
+        return {
+            "success": True,
+            "message": _("API keys regenerated successfully"),
+            "details": messages,
+            "data": {
+                "username": bot_email,
+                "api_key": mask_api_key(api_key),
+                "action": "regenerate"
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(
+            title="API Keys Regeneration Failed",
+            message=frappe.get_traceback()
+        )
+        frappe.db.rollback()
+        
+        return {
+            "success": False,
+            "message": _("Failed to regenerate API keys: {0}").format(str(e)),
+            "details": []
+        }
