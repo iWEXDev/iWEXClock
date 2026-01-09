@@ -5,7 +5,11 @@ app_description = "Employee Time Tracking and Productivity Monitoring System"
 app_email = "support@iwex.in"
 app_license = "mit"
 
+# iwexclock/hooks.py
 
+after_install = "iwexclock.install.after_install"
+
+before_uninstall = "iwexclock.install.before_uninstall"
 
 
 doc_events = {

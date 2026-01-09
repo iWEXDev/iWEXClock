@@ -50,9 +50,9 @@
   },
   {
    "fieldname": "related_company",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Related Company",
-   "options": "Company"
+   "description": "Company name (auto-links to Company if ERPNext installed)"
   },
   {
    "fieldname": "column_break_bfkx",

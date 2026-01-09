@@ -27,11 +27,11 @@
   "column_break_registration",
   "registration_date",
   "customer_id",
+  "register_button",
   "auto_delete_reminder",
   "key",
   "column_break_kwsb",
   "delete_all_reminders",
-  "setup_bot_and_keys",
   "column_break_bggp",
   "iwexclock_id",
   "registration_status",
@@ -49,13 +49,11 @@
    "label": "Company Information"
   },
   {
-   "description": "Enter your company's legal name",
-   "fieldname": "company_name",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Company Name",
-   "options": "Company",
-   "reqd": 1
+      "fieldname": "company_name",
+      "fieldtype": "Data",
+      "label": "Company Name",
+      "reqd": 0,
+      "description": "Company name for registration"
   },
   {
    "description": "Full business address",
@@ -175,13 +173,13 @@
    "label": "iWEXClock ID"
   },
   {
-   "default": "Not Registered",
-   "fieldname": "registration_status",
-   "fieldtype": "Select",
-   "label": "Registration Status",
-   "options": "Not Registered\nPending Verification\nRegistered\nLocked",
-   "read_only": 1
-  },
+    "default": "Not Registered",
+    "fieldname": "registration_status",
+    "fieldtype": "Select",
+    "label": "Registration Status",
+    "options": "Not Registered\nPending Verification\nPending Bot Creation\nRegistered\nLocked",
+    "read_only": 1
+    },
   {
    "fieldname": "column_break_registration",
    "fieldtype": "Column Break"
@@ -200,6 +198,12 @@
    "read_only": 1
   },
   {
+    "fieldname": "register_button",
+    "fieldtype": "Button",
+    "label": "Register",
+    "description": "Click to register with iWEXClock and create bot user & API keys"
+  },
+  {
    "default": "90",
    "fieldname": "auto_delete_reminder",
    "fieldtype": "Int",
@@ -216,11 +220,6 @@
    "fieldname": "delete_all_reminders",
    "fieldtype": "Button",
    "label": "Delete All Reminders Now"
-  },
-  {
-   "fieldname": "setup_bot_and_keys",
-   "fieldtype": "Button",
-   "label": "Create Bot & Keys"
   },
   {
    "fieldname": "section_break_nexf",
