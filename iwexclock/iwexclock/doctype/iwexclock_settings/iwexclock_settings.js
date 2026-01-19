@@ -8,11 +8,18 @@ frappe.ui.form.on('iWEXClock Settings', {
                 let has_company = !!r.message;
                 console.log('📦 Company DocType exists:', has_company);
 
+                // ✅ ADDED: store this flag for reuse in other functions/buttons
+                frm._has_company_doctype = has_company;
+
                 if (has_company) {
                     // ═════════════════════════════════════════════
                     // SCENARIO 1: ERPNext Site
                     // ═════════════════════════════════════════════
                     setup_company_field_for_erpnext(frm);
+
+                    // ✅ ADDED: Show Multi-Company Section + Companies table
+                    frm.toggle_display("section_multi_company", true);
+                    frm.toggle_display("companies", true);
 
                     // ---- Users child table: related_company → Link ----
                     if (frm.fields_dict.users) {
@@ -45,6 +52,11 @@ frappe.ui.form.on('iWEXClock Settings', {
                     // SCENARIO 2: Plain Frappe Site
                     // ═════════════════════════════════════════════
                     setup_company_field_for_frappe(frm);
+
+                    // ✅ ADDED: Hide Multi-Company Section + Companies table permanently
+                    // (so it won't be visible even before clicking any button)
+                    frm.toggle_display("section_multi_company", false);
+                    frm.toggle_display("companies", false);
 
                     console.log('✅ Users table: related_company → Data (Frappe mode)');
                 }
@@ -123,7 +135,65 @@ frappe.ui.form.on('iWEXClock Settings', {
         if (frm.doc.registration_status === 'Registered') {
             iwexclock_welcome_integration.on_registration_complete(frm);
         }
-    }
+    },
+    
+
+    fetch_companies: function(frm) {
+
+    frappe.call({
+        method: "iwexclock.iwexclock.doctype.iwexclock_settings.iwexclock_settings.fetch_companies_and_users",
+        freeze: true,
+        freeze_message: __("Fetching companies and users..."),
+        callback: function(r) {
+
+            if (!r.message) return;
+
+            const data = r.message;
+
+            // ✅ COMPANIES TABLE
+            frm.clear_table("companies");
+
+            (data.companies || []).forEach(c => {
+                let row = frm.add_child("companies");
+
+                // ✅ Your child table fieldnames:
+                // company, l_employees, billing_address
+                row.company = c.company || "";
+                row.total_employees = c.total_employees || 0;
+                row.billing_address = c.billing_address || "";
+            });
+
+            frm.refresh_field("companies");
+
+            // ✅ USERS TABLE
+            frm.clear_table("users");
+
+            (data.users || []).forEach(u => {
+                let row = frm.add_child("users");
+
+                // ✅ Your child table fieldnames:
+                // related_company, user_id, full_name, email_id, mobile_number, is_active
+                row.related_company = u.related_company || "";
+                row.user_id = u.user_id || "";
+                row.full_name = u.full_name || "";
+                row.email_id = u.email_id || "";          // ✅ Mandatory
+                row.mobile_number = u.mobile_number || "";
+                row.is_active = u.is_active ? 1 : 0;
+            });
+
+            frm.refresh_field("users");
+
+            frappe.show_alert({
+                message: __("✅ Fetched successfully"),
+                indicator: "green"
+            });
+        }
+    });
+}
+
+
+
+
 });
 function setup_company_field_for_erpnext(frm) {
     console.log('🏢 Setting up for ERPNext environment');
@@ -462,6 +532,10 @@ function validate_registration_form(frm) {
         return { valid: false, message: __('Domain Name is required') };
     }
     
+    if (!doc.number_of_iwexclock_users || parseInt(doc.number_of_iwexclock_users) <= 0) {
+        return { valid: false, message: __('Number of iWEXClock users is required') };
+    }
+
     // ───────────────────────────────────────────────────────────────────
     // Email validation
     // ───────────────────────────────────────────────────────────────────
@@ -494,7 +568,8 @@ function send_registration_request(frm) {
             admin_full_name: doc.admin_full_name,
             admin_email_id: doc.admin_email_id,
             primary_contact_number: doc.primary_contact_number,
-            domain_name: doc.domain_name
+            domain_name: doc.domain_name,
+            number_of_iwexclock_users: doc.number_of_iwexclock_users
         },
         freeze: true,
         freeze_message: __('Registering with iWEXClock central server...'),

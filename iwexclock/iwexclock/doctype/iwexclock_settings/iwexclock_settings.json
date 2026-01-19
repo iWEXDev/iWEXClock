@@ -7,8 +7,6 @@
  "field_order": [
   "section_company_info",
   "company_name",
-  "frappe_hr_installed",
-  "total_employees",
   "column_break_basic",
   "company_address",
   "section_admin_details",
@@ -19,6 +17,9 @@
   "primary_contact_number",
   "section_domain",
   "domain_name",
+  "number_of_iwexclock_users",
+  "column_break_domain_btn",
+  "fetch_companies",
   "section_multi_company",
   "companies",
   "section_users",
@@ -74,23 +75,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "0",
-   "depends_on": "frappe_hr_installed",
-   "description": "Auto-calculated from companies table",
-   "fieldname": "total_employees",
-   "fieldtype": "Int",
-   "label": "Total Employees",
-   "read_only": 1
-  },
-  {
-   "default": "0",
-   "description": "Auto-detected by system",
-   "fieldname": "frappe_hr_installed",
-   "fieldtype": "Check",
-   "label": "Frappe HR Installed",
-   "read_only": 1
-  },
-  {
    "fieldname": "section_admin_details",
    "fieldtype": "Section Break",
    "label": "Administrator Details"
@@ -136,6 +120,25 @@
    "reqd": 1
   },
   {
+    "fieldname": "number_of_iwexclock_users",
+    "fieldtype": "Int",
+    "label": "Number of iWEXClock Users",
+    "reqd": 1,
+    "default": "0",
+    "description": "Total number of users allowed for this customer"
+  },
+  {
+    "fieldname": "column_break_domain_btn",
+    "fieldtype": "Column Break"
+  },
+  {
+    "fieldname": "fetch_companies",
+    "fieldtype": "Button",
+    "label": "Fetch Companies",
+    "description": "Fetch companies and users from this site"
+  },
+
+  {
    "collapsible": 1,
    "fieldname": "section_multi_company",
    "fieldtype": "Section Break",
@@ -167,7 +170,7 @@
    "label": "Registration Details"
   },
   {
-   "description": "Your unique registration ID (filled after successful registration)",
+   "description": "Your unique iWEXClock registration ID",
    "fieldname": "iwexclock_id",
    "fieldtype": "Data",
    "label": "iWEXClock ID"
@@ -177,7 +180,7 @@
     "fieldname": "registration_status",
     "fieldtype": "Select",
     "label": "Registration Status",
-    "options": "Not Registered\nPending Verification\nPending Bot Creation\nRegistered\nLocked",
+    "options": "Not Registered\nPending Verification\nPending Bot Creation\nRegistered\nLocked\nAmmended",
     "read_only": 1
     },
   {
@@ -201,7 +204,7 @@
     "fieldname": "register_button",
     "fieldtype": "Button",
     "label": "Register",
-    "description": "Click to register with iWEXClock and create bot user & API keys"
+    "description": "Click to register at iWEXClock"
   },
   {
    "default": "90",
@@ -216,7 +219,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "This will delete all reminders owner by the iWEXClock Bot.",
+   "description": "This will delete all reminders of iWEXClock Bot.",
    "fieldname": "delete_all_reminders",
    "fieldtype": "Button",
    "label": "Delete All Reminders Now"
@@ -273,6 +276,7 @@
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
+
   {
    "create": 1,
    "delete": 1,

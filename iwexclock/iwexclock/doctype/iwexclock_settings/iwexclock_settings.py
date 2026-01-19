@@ -178,6 +178,201 @@ class iWEXClockSettings(Document):
                 )
                 
                 frappe.logger().info("🎉 Registration complete - cleanup enqueued")
+        # ═══════════════════════════════════════════════════════════════
+        # SCENARIO 2: Update fields to central server (if already registered)
+        # ═══════════════════════════════════════════════════════════════
+        if self.registration_status == "Registered" and self.iwexclock_id:
+            # Skip if this is the initial registration save
+            if not self.has_value_changed("registration_status"):
+                # Get changed fields (excluding child tables)
+                changed_fields = self.get_changed_fields_for_sync()
+                
+                if changed_fields:
+                    frappe.logger().info(f"📝 Detected field changes: {list(changed_fields.keys())}")
+                    
+                    # Sync in background (same pattern as registration)
+                    frappe.enqueue(
+                        'iwexclock.iwexclock.doctype.iwexclock_settings.iwexclock_settings.sync_updated_fields_to_central',
+                        queue='short',
+                        timeout=60,
+                        iwexclock_id=self.iwexclock_id,
+                        changed_fields=changed_fields,
+                        enqueue_after_commit=True
+                    )
+                    
+                    frappe.logger().info("🔄 Field update sync enqueued")
+
+
+    # ═══════════════════════════════════════════════════════════════════
+    #                    HELPER FUNCTIONS
+    # ═══════════════════════════════════════════════════════════════════
+
+    def get_changed_fields_for_sync(self):
+        """
+        Get dictionary of fields that changed and should sync to central server
+        
+        Based on ACTUAL fields that exist in iWEXClock Settings DocType:
+        - admin_user_id
+        - admin_full_name  
+        - admin_email_id
+        - primary_contact_number
+        - domain_name
+        - company_name
+        - company_address
+        - number_of_iwexclock_users
+        
+        Returns:
+            dict: {field_name: new_value} for changed syncable fields
+        """
+        # ✅ Fields that SHOULD sync (based on ACTUAL DocType fields)
+        SYNCABLE_FIELDS = {
+            'admin_user_id',
+            'admin_full_name', 
+            'admin_email_id',
+            'primary_contact_number',
+            'domain_name',
+            'company_name',
+            'company_address',
+            'number_of_iwexclock_users'
+        }
+        
+        changed = {}
+        
+        if not self.is_new():
+            frappe.logger().info(f"🔍 Checking {len(SYNCABLE_FIELDS)} fields for changes")
+            
+            for field in SYNCABLE_FIELDS:
+                if self.has_value_changed(field):
+                    changed[field] = self.get(field)
+                    frappe.logger().info(f"  ✓ Changed: {field} = '{self.get(field)}'")
+        
+        frappe.logger().info(f"🔍 Total changed fields: {len(changed)}")
+        return changed
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# ✅ CRITICAL: This MUST be OUTSIDE the class (module-level function)
+# ═══════════════════════════════════════════════════════════════════════
+
+def sync_updated_fields_to_central(iwexclock_id, changed_fields):
+    """
+    Background job: Update registration fields on central server
+    
+    ✅ MUST be module-level function (outside class) so frappe.enqueue() can call it
+    
+    Args:
+        iwexclock_id: Registration ID on central server (e.g., "iWC.25.01.0001")
+        changed_fields: Dictionary of {field: value} to update
+    """
+    frappe.logger().info("=" * 70)
+    frappe.logger().info("🔄 SYNCING FIELD UPDATES TO CENTRAL SERVER")
+    frappe.logger().info("=" * 70)
+    frappe.logger().info(f"Registration ID: {iwexclock_id}")
+    frappe.logger().info(f"Fields to update: {list(changed_fields.keys())}")
+    
+    try:
+        # Get API URL
+        api_base_url = get_iwexclock_api_url()
+        frappe.logger().info(f"📍 API Base URL: {api_base_url}")
+        
+        # Prepare payload
+        payload = {
+            'iwexclock_id': iwexclock_id,
+            'updated_fields': changed_fields
+        }
+        
+        frappe.logger().info(f"📦 Payload: {json.dumps(payload, indent=2)}")
+        
+        # Call central API
+        full_api_url = f"{api_base_url}/api/method/iwexclock_parent.api.registration.update_registration_fields"
+        frappe.logger().info(f"🌐 Full URL: {full_api_url}")
+        frappe.logger().info(f"🔍 Sending POST request...")
+        
+        response = requests.post(
+            url=full_api_url,
+            json=payload,
+            headers={
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            timeout=30
+        )
+        
+        frappe.logger().info(f"📥 Response Status: {response.status_code}")
+        frappe.logger().info(f"📥 Response Body (first 500 chars): {response.text[:500]}")
+        
+        # Handle empty response
+        if not response.text or response.text.strip() == "":
+            frappe.logger().error("❌ Empty response from central server")
+            frappe.log_error(
+                title="Field Update Sync Failed - Empty Response",
+                message=f"URL: {full_api_url}\nPayload: {json.dumps(payload, indent=2)}"
+            )
+            return
+        
+        # Handle HTTP errors
+        if response.status_code != 200:
+            frappe.logger().error(f"❌ HTTP Error {response.status_code}")
+            frappe.log_error(
+                title=f"Field Update Sync Failed - HTTP {response.status_code}", 
+                message=f"URL: {full_api_url}\nResponse: {response.text[:1000]}"
+            )
+            return
+        
+        # Parse response
+        try:
+            result = response.json()
+            frappe.logger().info(f"🔍 Parsed JSON: {json.dumps(result, indent=2)}")
+            
+            # Unwrap Frappe's message wrapper if present
+            if 'message' in result:
+                result = result['message']
+            
+            if result.get('status') == 'success':
+                frappe.logger().info("✅ Fields synced successfully to central server")
+                frappe.logger().info(f"   Updated {result.get('updated_count', 0)} field(s)")
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                frappe.logger().error(f"❌ Sync failed: {error_msg}")
+                frappe.log_error(
+                    title="Field Update Sync Failed - Server Error",
+                    message=f"Error: {error_msg}\nPayload: {json.dumps(payload, indent=2)}"
+                )
+        
+        except json.JSONDecodeError as json_err:
+            frappe.logger().error(f"❌ JSON parse error: {str(json_err)}")
+            frappe.logger().error(f"   Raw response: {response.text[:500]}")
+            frappe.log_error(
+                title="Field Update Sync - Invalid JSON",
+                message=f"Error: {str(json_err)}\nResponse: {response.text[:1000]}"
+            )
+    
+    except requests.exceptions.ConnectionError as conn_err:
+        frappe.logger().error("❌ Connection error - Cannot reach central server")
+        frappe.logger().error(f"   Error: {str(conn_err)}")
+        frappe.log_error(
+            title="Field Update Sync - Connection Error",
+            message=f"URL: {api_base_url}\nError: {str(conn_err)}"
+        )
+    
+    except requests.exceptions.Timeout:
+        frappe.logger().error("❌ Request timeout (30 seconds)")
+        frappe.log_error(
+            title="Field Update Sync - Timeout",
+            message=f"URL: {api_base_url} timed out after 30 seconds"
+        )
+    
+    except Exception as e:
+        frappe.logger().error(f"❌ Unexpected error: {str(e)}")
+        frappe.logger().error(frappe.get_traceback())
+        frappe.log_error(
+            title="Field Update Sync - Unexpected Error",
+            message=frappe.get_traceback()
+        )
+    
+    finally:
+        frappe.logger().info("=" * 70)
+
 
 def check_system_manager_permission():
     """
@@ -677,6 +872,7 @@ def register_with_iwex(
     admin_email_id,
     primary_contact_number,
     domain_name,
+    number_of_iwexclock_users,
     company_name=None
 ):
     """
@@ -707,8 +903,6 @@ def register_with_iwex(
     # ═══════════════════════════════════════════════════════════════════
     company_details = get_company_details_safe(actual_company_name)
     
-    import requests
-    import json
     
     try:
         # ═══════════════════════════════════════════════════════════════
@@ -723,7 +917,7 @@ def register_with_iwex(
             'admin_mobile': primary_contact_number,
             'company_name': actual_company_name,  # ← Use smart company name
             'domain': domain_name,
-            
+            "number_of_iwexclock_users": number_of_iwexclock_users,
             # Company details (if available from ERPNext)
             "gstin": company_details.get("gstin"),
             "tax_id": company_details.get("tax_id"),
@@ -890,3 +1084,139 @@ def fetch_and_cache_from_github():
     except Exception as e:
         frappe.logger().error(f"GitHub fetch failed: {e}")
         return None
+
+
+@frappe.whitelist()
+def fetch_companies_and_users():
+    result = {
+        "is_erpnext": False,
+        "has_hrms": False,
+        "companies": [],
+        "users": []
+    }
+
+    # ----------------------------------------------------
+    # ERPNext check (Company exists)
+    # ----------------------------------------------------
+    if frappe.db.exists("DocType", "Company"):
+        result["is_erpnext"] = True
+
+    # ----------------------------------------------------
+    # HRMS check (Employee exists)
+    # ----------------------------------------------------
+    if frappe.db.exists("DocType", "Employee"):
+        result["has_hrms"] = True
+
+    # ----------------------------------------------------
+    # 1) COMPANIES TABLE DATA
+    # ----------------------------------------------------
+    if result["is_erpnext"]:
+        company_list = frappe.get_all(
+            "Company",
+            filters={"is_group": 0},
+            fields=["name"]
+        )
+
+        for c in company_list:
+            company_name = c.name
+
+            # ✅ Total Employees count
+            if result["has_hrms"]:
+                total_employees = frappe.db.count("Employee", {"company": company_name})
+            else:
+                # ERPNext without HRMS → count Users (best fallback)
+                total_employees = frappe.db.count("User", {"enabled": 1})
+
+            # ✅ Billing Address (best effort)
+            billing_address = ""
+            try:
+                # Try "Address" linked with Company
+                # This uses Dynamic Link table used by Address
+                address_names = frappe.get_all(
+                    "Dynamic Link",
+                    filters={
+                        "link_doctype": "Company",
+                        "link_name": company_name,
+                        "parenttype": "Address"
+                    },
+                    fields=["parent"]
+                )
+
+                if address_names:
+                    addr_doc = frappe.get_doc("Address", address_names[0].parent)
+                    billing_address = addr_doc.get("address_line1", "") or ""
+
+                    if addr_doc.get("address_line2"):
+                        billing_address += "\n" + addr_doc.get("address_line2")
+
+                    if addr_doc.get("city"):
+                        billing_address += "\n" + addr_doc.get("city")
+
+                    if addr_doc.get("state"):
+                        billing_address += "\n" + addr_doc.get("state")
+
+                    if addr_doc.get("pincode"):
+                        billing_address += "\n" + addr_doc.get("pincode")
+
+                    if addr_doc.get("country"):
+                        billing_address += "\n" + addr_doc.get("country")
+
+            except Exception:
+                billing_address = ""
+
+            result["companies"].append({
+                "company": company_name,
+                "total_employees": total_employees,
+                "billing_address": billing_address
+            })
+
+    # ----------------------------------------------------
+    # 2) USERS TABLE DATA
+    # ----------------------------------------------------
+    if result["has_hrms"]:
+        # ✅ HRMS → Employee based fetching
+        employees = frappe.get_all(
+            "Employee",
+            fields=["name", "employee_name", "user_id", "company", "cell_number"]
+        )
+
+        for emp in employees:
+            if not emp.user_id:
+                continue
+
+            # Get email + enabled from User
+            user_doc = frappe.get_value(
+                "User",
+                emp.user_id,
+                ["enabled", "email", "full_name"],
+                as_dict=True
+            ) or {}
+
+            result["users"].append({
+                "related_company": emp.company or "",
+                "user_id": emp.user_id,
+                "full_name": emp.employee_name or user_doc.get("full_name") or "",
+                "email_id": user_doc.get("email") or emp.user_id,
+                "mobile_number": emp.cell_number or "",
+                "is_active": int(user_doc.get("enabled") or 0)
+            })
+
+    else:
+        # ✅ No HRMS → User based fetching
+        users = frappe.get_all(
+            "User",
+            fields=["name", "full_name", "email", "enabled", "mobile_no"]
+        )
+
+        for u in users:
+            result["users"].append({
+                "related_company": "",   # no company link in plain frappe
+                "user_id": u.name,
+                "full_name": u.full_name or "",
+                "email_id": u.email or "",
+                "mobile_number": u.mobile_no or "",
+                "is_active": int(u.enabled or 0)
+            })
+
+    return result
+
