@@ -233,7 +233,13 @@ class iWEXClockSettings(Document):
             'domain_name',
             'company_name',
             'company_address',
-            'number_of_iwexclock_users'
+            'number_of_iwexclock_users',
+            'server_sync_interval',
+            'data_sync_interval',
+            'toggle_interval',
+            'idle_interval'
+
+
         }
         
         changed = {}
@@ -919,10 +925,16 @@ def register_with_iwex(
             'domain': domain_name,
             "number_of_iwexclock_users": number_of_iwexclock_users,
             # Company details (if available from ERPNext)
-            "gstin": company_details.get("gstin"),
-            "tax_id": company_details.get("tax_id"),
-            "default_currency": company_details.get("default_currency"),
-            "country": company_details.get("country"),
+            "gstin": (settings.get("gstin") or "").strip(),
+
+            "default_currency": settings.get("default_currency"),
+            "country": settings.get("country"),
+
+            # ✅ NEW: SEND SYNC INTERVALS ALSO
+            "server_sync_interval": settings.get("server_sync_interval"),
+            "data_sync_interval": settings.get("data_sync_interval"),
+            "toggle_interval": settings.get("toggle_interval"),
+            "idle_interval": settings.get("idle_interval"),
             "company_email": company_details.get("email"),
             "company_phone": company_details.get("phone_no"),
             "website": company_details.get("website")
@@ -1085,6 +1097,52 @@ def fetch_and_cache_from_github():
         frappe.logger().error(f"GitHub fetch failed: {e}")
         return None
 
+@frappe.whitelist()
+def fetch_company_details(company_name):
+    """
+    Fetch company details for auto-filling fields in iWEXClock Settings
+    
+    Called from JavaScript when company_name field changes
+    
+    Args:
+        company_name (str): Name of the company to fetch
+        
+    Returns:
+        dict: Company details or empty dict if not found/not available
+    """
+    if not company_name or not isinstance(company_name, str):
+        return {}
+    
+    # Check if Company DocType exists
+    if not is_erpnext_installed():
+        frappe.logger().info("📦 Company DocType not found - skipping auto-fetch")
+        return {}
+    
+    # Check if company exists
+    if not frappe.db.exists("Company", company_name):
+        frappe.logger().info(f"⚠️ Company '{company_name}' not found in Company list")
+        return {}
+    
+    try:
+        # Fetch company document
+        company_doc = frappe.get_doc("Company", company_name)
+        
+        # Extract required fields
+        company_details = {
+            "gstin": getattr(company_doc, "gstin", None) or "",
+            "tax_id": getattr(company_doc, "tax_id", None) or "",
+            "default_currency": getattr(company_doc, "default_currency", None) or "",
+            "country": getattr(company_doc, "country", None) or ""
+        }
+        
+        frappe.logger().info(f"✅ Fetched company details for: {company_name}")
+        return company_details
+        
+    except Exception as e:
+        frappe.logger().error(f"❌ Error fetching company details: {str(e)}")
+        frappe.logger().error(frappe.get_traceback())
+        return {}
+
 
 @frappe.whitelist()
 def fetch_companies_and_users():
@@ -1219,4 +1277,3 @@ def fetch_companies_and_users():
             })
 
     return result
-

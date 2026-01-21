@@ -3,7 +3,8 @@ from __future__ import unicode_literals
 import frappe
 from cryptography.fernet import Fernet, InvalidToken
 import base64
-
+import json
+import requests
 
 
 def decrypt_iwexclock_fields(doc, method=None):
@@ -78,5 +79,3 @@ def decrypt_iwexclock_fields(doc, method=None):
                 "IWEXClock Decryption Error"
             )
             continue
-
-

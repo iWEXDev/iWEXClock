@@ -63,6 +63,80 @@ frappe.ui.form.on('iWEXClock Settings', {
             }
         });
     },
+    // ═══════════════════════════════════════════════════════════════════
+    // COMPANY NAME CHANGE - Auto-fetch company details
+    // ═══════════════════════════════════════════════════════════════════
+    company_name: function(frm) {
+        console.log('🏢 Company name changed:', frm.doc.company_name);
+        
+        // Only proceed if company_name has a value
+        if (!frm.doc.company_name || frm.doc.company_name.trim() === '') {
+            console.log('⚠️ Company name is empty - skipping auto-fetch');
+            return;
+        }
+        
+        // Only fetch if Company DocType exists (ERPNext environment)
+        if (!frm._has_company_doctype) {
+            console.log('⚠️ Company DocType not available - skipping auto-fetch');
+            return;
+        }
+        
+        console.log('📡 Fetching company details from server...');
+        
+        frappe.call({
+            method: 'iwexclock.iwexclock.doctype.iwexclock_settings.iwexclock_settings.fetch_company_details',
+            args: {
+                company_name: frm.doc.company_name
+            },
+            callback: function(r) {
+                console.log('📥 Company details response:', r.message);
+                
+                if (r.message && Object.keys(r.message).length > 0) {
+                    // Company found - auto-fill fields
+                    const details = r.message;
+                    
+                    let gstin_value = (details.gstin && details.gstin.trim())
+                        ? details.gstin.trim()
+                        : ((details.tax_id && details.tax_id.trim()) ? details.tax_id.trim() : "");
+
+                    if (gstin_value) {
+                        frm.set_value('gstin', gstin_value);
+                        console.log('✅ Auto-filled GSTIN / Tax ID:', gstin_value);
+                    } else {
+                        console.log('⚠️ GSTIN and Tax ID both empty - not setting gstin field');
+                    }
+                    
+                    // Set Default Currency if available
+                    if (details.default_currency) {
+                        frm.set_value('default_currency', details.default_currency);
+                        console.log('✅ Auto-filled Default Currency:', details.default_currency);
+                    }
+                    
+                    // Set Country if available
+                    if (details.country) {
+                        frm.set_value('country', details.country);
+                        console.log('✅ Auto-filled Country:', details.country);
+                    }
+                    
+                    // Show success notification
+                    frappe.show_alert({
+                        message: __('✅ Company details auto-filled'),
+                        indicator: 'green'
+                    }, 3);
+                    
+                } else {
+                    // Company not found or no details available
+                    console.log('⚠️ No company details found - fields not modified');
+                }
+            },
+            error: function(r) {
+                console.error('🔴 Error fetching company details:', r);
+                // Silent fail - don't disrupt user experience
+            }
+        });
+    },
+
+
 
     // ───────────────────────────────────────────────────────────────────
     // REFRESH EVENT - Called when form loads or reloads
