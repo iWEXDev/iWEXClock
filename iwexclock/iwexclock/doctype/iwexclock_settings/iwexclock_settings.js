@@ -63,6 +63,42 @@ frappe.ui.form.on('iWEXClock Settings', {
             }
         });
     },
+    update_key: function(frm) {
+
+        frappe.confirm(
+            __('Regenerate Key?<br><br>This will replace existing key.'),
+            function () {
+
+                frappe.call({
+                    method: "iwexclock.iwexclock.doctype.iwexclock_settings.iwexclock_settings.update_key",
+                    freeze: true,
+                    freeze_message: __("Updating key..."),
+                    callback: function(r) {
+
+                        if (r.message && r.message.success) {
+
+                            frm.set_value("key", r.message.key);
+                            frm.refresh_field("key");
+
+                            frappe.msgprint({
+                                title: __('✅ Key Updated'),
+                                message: __('New key generated successfully'),
+                                indicator: 'green'
+                            });
+
+                        } else {
+                            frappe.msgprint({
+                                title: __('Error'),
+                                message: r.message.message || "Failed to update key",
+                                indicator: 'red'
+                            });
+                        }
+                    }
+                });
+
+            }
+        );
+    },
     // ═══════════════════════════════════════════════════════════════════
     // COMPANY NAME CHANGE - Auto-fetch company details
     // ═══════════════════════════════════════════════════════════════════
@@ -387,6 +423,12 @@ function update_register_button_state(frm) {
     if (status === 'Registered' && has_id) {
         console.log('🔑 Button: Regenerate Keys');
         frm.set_df_property('register_button', 'label', __('Regenerate Keys'));
+        frm.set_df_property(
+            'register_button',
+            'description',
+            __('Regenerate API keys of bot and replace existing ones')
+        );
+
         if (frm.fields_dict.register_button) {
             frm.fields_dict.register_button.$wrapper.show();
         }
@@ -399,6 +441,11 @@ function update_register_button_state(frm) {
     if (status === 'Pending Bot Creation' && has_id) {
         console.log('🤖 Button: Create Bot & Keys');
         frm.set_df_property('register_button', 'label', __('Create Bot & Keys'));
+        frm.set_df_property(
+            'register_button',
+            'description',
+            __('Create bot user and generate API keys')
+        );
         if (frm.fields_dict.register_button) {
             frm.fields_dict.register_button.$wrapper.show();
         }
@@ -410,6 +457,11 @@ function update_register_button_state(frm) {
     // ───────────────────────────────────────────────────────────────────
     console.log('📝 Button: Register');
     frm.set_df_property('register_button', 'label', __('Register'));
+    frm.set_df_property(
+        'register_button',
+        'description',
+        __('Click to register at iWEXClock')
+    );
     if (frm.fields_dict.register_button) {
         frm.fields_dict.register_button.$wrapper.show();
     }

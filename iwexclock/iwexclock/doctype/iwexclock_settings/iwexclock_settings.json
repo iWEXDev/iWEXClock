@@ -33,20 +33,29 @@
   "server_sync_interval",
   "data_sync_interval",
   "column_break_sync",
-  "toggle_interval",
+  "has_hrms",
   "idle_interval",
   "section_registration",
   "column_break_registration",
   "registration_date",
+  "column_break_date",
   "customer_id",
+  "section_key_row_4",
   "register_button",
-  "auto_delete_reminder",
-  "key",
-  "column_break_kwsb",
-  "delete_all_reminders",
   "column_break_bggp",
   "iwexclock_id",
+  "column_break_statu",
   "registration_status",
+  "section_key_row_6",
+  "auto_delete_reminder",
+  "column_break_kwsb",
+  "delete_all_reminders",
+  "section_key_row_5",
+  "key",
+  "section_key_row_2",
+  "enc_key",
+  "column_break_key_2",
+  "update_key",
   "section_break_nexf",
   "bot_user",
   "column_break_osbx",
@@ -224,6 +233,14 @@
     "options": "Not Registered\nPending Verification\nPending Bot Creation\nRegistered\nLocked\nAmmended",
     "read_only": 1
     },
+    {
+  "fieldname": "section_key_row_6",
+  "fieldtype": "Section Break"
+  },
+    {
+  "fieldname": "section_key_row_4",
+  "fieldtype": "Section Break"
+  },
   {
    "fieldname": "column_break_registration",
    "fieldtype": "Column Break"
@@ -265,8 +282,20 @@
    "fieldtype": "Button",
    "label": "Delete All Reminders Now"
   },
+     {
+  "fieldname": "section_key_row_5",
+  "fieldtype": "Section Break"
+  },
   {
+   "fieldname": "column_break_date",
+   "fieldtype": "Column Break"
+  },
+    {
    "fieldname": "column_break_bggp",
+   "fieldtype": "Column Break"
+  },
+    {
+   "fieldname": "column_break_statu",
    "fieldtype": "Column Break"
   },
   {
@@ -274,6 +303,28 @@
    "fieldtype": "Data",
    "label": "Key",
    "permlevel": 1
+  },
+  {
+  "fieldname": "section_key_row_2",
+  "fieldtype": "Section Break"
+  },
+  {
+  "fieldname": "enc_key",
+  "fieldtype": "Data",
+  "label": "Encrypted Key",
+  "read_only": 1,
+  "description": "Encrypted form of system key used internally"
+  },
+  {
+  "fieldname": "column_break_key_2",
+  "fieldtype": "Column Break"
+  },
+  {
+  "fieldname": "update_key",
+  "fieldtype": "Button",
+  "label": "Update Key",
+  "description": "Regenerate system key",
+  "depends_on": "eval:doc.registration_status=='Registered'"
   },
   {
    "collapsible": 1,
@@ -300,10 +351,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "10",
-   "fieldname": "toggle_interval",
-   "fieldtype": "Int",
-   "label": "Toggle Interval"
+  "default": "0",
+  "fieldname": "has_hrms",
+  "fieldtype": "Check",
+  "label": "Is HRMS Enabled",
+  "description": "Enable HRMS related features"
   },
   {
    "default": "4",

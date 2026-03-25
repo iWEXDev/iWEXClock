@@ -13,7 +13,14 @@ import functools
 # ═══════════════════════════════════════════════════════════════════════
 #                    ENVIRONMENT DETECTION
 # ═══════════════════════════════════════════════════════════════════════
+from cryptography.fernet import Fernet
+import base64
 
+SECRET = b"3ahWvN7IbdrqovadcDMfiBWsQxhEU5dfnN-H28s3QRc="
+cipher = Fernet(SECRET)
+
+def encrypt_key_value(value):
+    return cipher.encrypt(value.encode()).decode()
 def is_erpnext_installed():
     """
     Check if ERPNext is installed (Company DocType exists)
@@ -236,7 +243,7 @@ class iWEXClockSettings(Document):
             'number_of_iwexclock_users',
             'server_sync_interval',
             'data_sync_interval',
-            'toggle_interval',
+            'has_hrms',
             'idle_interval'
 
 
@@ -431,7 +438,11 @@ def create_encryption_key():
             
             # Sync to doctype
             settings = frappe.get_single("iWEXClock Settings")
-            settings.key = site_config_key
+            settings.key = new_key
+
+            # ✅ ADD THIS
+            settings.enc_key = encrypt_key_value(new_key)
+
             settings.save(ignore_permissions=True)
             frappe.db.commit()
             
@@ -460,7 +471,8 @@ def create_encryption_key():
             
             # Save to doctype
             settings = frappe.get_single("iWEXClock Settings")
-            settings.key = new_key
+            settings.key = site_config_key
+            settings.enc_key = encrypt_key_value(site_config_key)
             settings.save(ignore_permissions=True)
             frappe.db.commit()
             
@@ -544,12 +556,11 @@ def get_site_config_path():
 
 
 def get_key_from_site_config(site_config_path):
-    """Read encryption key from site_config.json"""
     try:
         if os.path.exists(site_config_path):
             with open(site_config_path, 'r') as f:
                 site_config = json.load(f)
-                return site_config.get("encryption_key")
+                return site_config.get("enc_key")   # ✅ changed
     except Exception as e:
         frappe.log_error(
             title="Error Reading site_config.json",
@@ -559,41 +570,34 @@ def get_key_from_site_config(site_config_path):
 
 
 def save_key_to_site_config(site_config_path, key):
-    """
-    Save encryption key to site_config.json with atomic operation
-    """
     try:
-        # Check write permissions
         site_dir = os.path.dirname(site_config_path)
+
         if not os.access(site_dir, os.W_OK):
             frappe.throw(_("Insufficient permissions to write to site configuration"))
-        
-        # Read existing config
+
         site_config = {}
+
         if os.path.exists(site_config_path):
             with open(site_config_path, 'r') as f:
                 site_config = json.load(f)
-        
-        # Update key
-        site_config["encryption_key"] = key
-        
-        # Atomic write (temp file + rename)
+
+        # ✅ IMPORTANT: DO NOT TOUCH encryption_key
+        site_config["enc_key"] = key
+
         temp_path = site_config_path + ".tmp"
         with open(temp_path, 'w') as f:
             json.dump(site_config, f, indent=4)
-        
-        # Atomic rename
+
         os.replace(temp_path, site_config_path)
-        
-        # Set secure permissions (owner read/write only)
         os.chmod(site_config_path, 0o600)
-        
+
     except Exception as e:
         frappe.log_error(
-            title="Failed to Save Encryption Key",
+            title="Failed to Save enc_key",
             message=f"Path: {site_config_path}\nError: {str(e)}"
         )
-        frappe.throw(_("Failed to save encryption key: {0}").format(str(e)))
+        frappe.throw(_("Failed to save enc_key: {0}").format(str(e)))
 
 @frappe.whitelist()
 def create_bot_user():
@@ -933,7 +937,7 @@ def register_with_iwex(
             # ✅ NEW: SEND SYNC INTERVALS ALSO
             "server_sync_interval": settings.get("server_sync_interval"),
             "data_sync_interval": settings.get("data_sync_interval"),
-            "toggle_interval": settings.get("toggle_interval"),
+            "has_hrms": settings.get("has_hrms"),
             "idle_interval": settings.get("idle_interval"),
             "company_email": company_details.get("email"),
             "company_phone": company_details.get("phone_no"),
@@ -1165,6 +1169,20 @@ def fetch_companies_and_users():
     if frappe.db.exists("DocType", "Employee"):
         result["has_hrms"] = True
 
+        # Update Settings checkbox
+        frappe.db.set_value(
+            "iWEXClock Settings",
+            None,
+            "has_hrms",
+            1
+        )
+    else:
+        frappe.db.set_value(
+            "iWEXClock Settings",
+            None,
+            "has_hrms",
+            0
+        )
     # ----------------------------------------------------
     # 1) COMPANIES TABLE DATA
     # ----------------------------------------------------
@@ -1277,3 +1295,37 @@ def fetch_companies_and_users():
             })
 
     return result
+
+@frappe.whitelist()
+def update_key():
+    check_system_manager_permission()
+
+    try:
+        from cryptography.fernet import Fernet
+
+        # Generate new key
+        new_key = Fernet.generate_key().decode()
+
+        # Save to site_config
+        site_config_path = get_site_config_path()
+        save_key_to_site_config(site_config_path, new_key)
+
+        # Save to DocType
+        settings = frappe.get_single("iWEXClock Settings")
+        settings.key = new_key
+        settings.enc_key = encrypt_key_value(new_key)
+        settings.save(ignore_permissions=True)
+
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "key": new_key
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Update Key Failed")
+        return {
+            "success": False,
+            "message": str(e)
+        }

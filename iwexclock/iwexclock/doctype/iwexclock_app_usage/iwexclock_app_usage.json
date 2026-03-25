@@ -1,0 +1,26 @@
+{
+  "doctype": "DocType",
+  "name": "iWEXClock App Usage",
+  "module": "iWEXClock",
+  "istable": 1,
+  "fields": [
+    {
+      "fieldname": "app_name",
+      "label": "App Name",
+      "fieldtype": "Data",
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "file_path",
+      "label": "File / URL",
+      "fieldtype": "Data",
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "duration",
+      "label": "Duration",
+      "fieldtype": "Duration",
+      "in_list_view": 1
+    }
+  ]
+}
