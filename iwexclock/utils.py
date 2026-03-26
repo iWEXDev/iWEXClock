@@ -21,7 +21,7 @@ def decrypt_iwexclock_fields(doc, method=None):
     frappe.logger().info(f"=== DECRYPT HOOK CALLED === Method: {method}, Doc: {doc.name}")
 
     # Get encryption key from site_config.json
-    encryption_key = frappe.conf.get('encryption_key')
+    encryption_key = frappe.conf.get('enc_key')
 
     if not encryption_key:
         frappe.log_error("Encryption key missing in site_config.json", "IWEXClock Decryption Error")
