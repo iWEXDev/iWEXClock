@@ -18,8 +18,8 @@
     },
     {
       "fieldname": "duration",
-      "label": "Duration",
-      "fieldtype": "Duration",
+      "label": "Duration (Second)",
+      "fieldtype": "Int",
       "in_list_view": 1
     }
   ]
