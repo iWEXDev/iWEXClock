@@ -35,6 +35,7 @@ def after_install():
     create_navbar_announcement()
     create_note()
     create_notification_log()
+    create_default_reminder_data()
     
 
 
@@ -260,3 +261,39 @@ def cleanup_after_registration():
             message=frappe.get_traceback(),
             title="iWEXClock Cleanup Error"
         )
+def create_default_reminder_data():
+    # ✅ Default Reminder Type
+    reminder_title = "Health"
+
+    # Step 1: Create Reminder Type
+    if not frappe.db.exists("Reminder Type", {"title": reminder_title}):
+        reminder = frappe.get_doc({
+            "doctype": "Reminder Type",
+            "title": reminder_title
+        })
+        reminder.insert(ignore_permissions=True)
+    else:
+        reminder = frappe.get_doc("Reminder Type", {"title": reminder_title})
+
+    # Step 2: Create Subtypes
+    subtypes = [
+        {
+            "title": "Hydration",
+            "description": "Drink water regularly throughout the day"
+        },
+        {
+            "title": "Eye Rest Breaks",
+            "description": "Follow 20-20-20 rule (every 20 minutes, look at something 20 feet away for 20 seconds)"
+        }
+    ]
+
+    for sub in subtypes:
+        if not frappe.db.exists("Sub Type", {"title": sub["title"], "link_yhch": reminder.name}):
+            frappe.get_doc({
+                "doctype": "Sub Type",
+                "title": sub["title"],
+                "link_yhch": reminder.name,   # 🔥 IMPORTANT LINK FIELD
+                "description": sub["description"]
+            }).insert(ignore_permissions=True)
+
+    frappe.db.commit()
