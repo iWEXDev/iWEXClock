@@ -17,19 +17,14 @@ doc_events = {
         "before_insert": "iwexclock.utils.decrypt_iwexclock_fields",
         "before_validate": "iwexclock.utils.decrypt_iwexclock_fields",
         "before_save": "iwexclock.utils.decrypt_iwexclock_fields"
+    },
+    "iWEXClock Reminder": {
+        "before_insert": "iwexclock.utils.set_reminder_id",
+        "validate": "iwexclock.utils.set_next_alert"
     }
 }
 fixtures = [
-    {
-        "doctype": "Server Script",
-        "filters": [
-            ["name", "in", [
-                "Next_alert Scheduler",
-                "iWEXClock Reminder next_alert",
-                "iWEXClock Reminder ID"
-            ]]
-        ]
-    },
+   
     {
         "doctype": "Client Script",
         "filters": [
@@ -44,7 +39,11 @@ fixtures = [
         ]
     }
 ]
-
+scheduler_events = {
+    "all": [
+        "iwexclock.tasks.process_reminders"
+    ]
+}
 
 
 # Apps
