@@ -37,6 +37,12 @@ fixtures = [
                 "iWEXClock Reminder Title"
             ]]
         ]
+    },
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["name", "=", "ToDo-custom_subject"]
+        ]
     }
 ]
 scheduler_events = {
