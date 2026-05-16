@@ -39,9 +39,21 @@ fixtures = [
         ]
     },
     {
-        "dt": "Custom Field",
+        "doctype": "Custom Field",
         "filters": [
             ["name", "=", "ToDo-custom_subject"]
+        ]
+    },
+    {
+        "doctype": "Property Setter",
+        "filters": [
+            ["name", "in", [
+                "ToDo-main-autoname",
+                "ToDo-main-naming_rule",
+                "ToDo-main-subject_field",
+                "ToDo-main-show_title_field_in_link",
+                "ToDo-main-title_field"
+            ]]
         ]
     }
 ]
