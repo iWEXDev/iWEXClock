@@ -5,6 +5,7 @@ from cryptography.fernet import Fernet, InvalidToken
 import base64
 import json
 import requests
+from frappe.utils import getdate, get_datetime, format_duration
 
 
 def decrypt_iwexclock_fields(doc, method=None):
@@ -280,3 +281,47 @@ def set_next_alert(doc, method=None):
             except Exception as e:
                 frappe.log_error(f"Error in Custom frequency logic: {str(e)}")
                 doc.next_alert_on = None
+
+
+
+from frappe.utils import getdate, get_datetime
+
+
+def set_timing_details(doc, method=None):
+
+    try:
+
+        # Set Start Date
+        if doc.start_time:
+            doc.start_date = getdate(doc.start_time)
+
+        # Set End Date
+        if doc.end_time:
+            doc.end_date = getdate(doc.end_time)
+
+        # Calculate Duration
+        if doc.start_time and doc.end_time:
+
+            start_time = get_datetime(doc.start_time)
+            end_time = get_datetime(doc.end_time)
+
+            duration_seconds = (
+                end_time - start_time
+            ).total_seconds()
+
+            if duration_seconds >= 0:
+
+                hours = int(duration_seconds // 3600)
+                minutes = int((duration_seconds % 3600) // 60)
+                seconds = int(duration_seconds % 60)
+
+                doc.duration = (
+                    f"{hours:02}:{minutes:02}:{seconds:02}"
+                )
+
+    except Exception:
+
+        frappe.log_error(
+            frappe.get_traceback(),
+            "iWEXClock Timing Calculation Error"
+        )

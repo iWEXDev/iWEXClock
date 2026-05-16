@@ -14,9 +14,9 @@ before_uninstall = "iwexclock.install.before_uninstall"
 
 doc_events = {
     "iWEXClock Data": {
-        "before_insert": "iwexclock.utils.decrypt_iwexclock_fields",
+        "before_insert": ["iwexclock.utils.decrypt_iwexclock_fields","iwexclock.utils.set_timing_details"],
         "before_validate": "iwexclock.utils.decrypt_iwexclock_fields",
-        "before_save": "iwexclock.utils.decrypt_iwexclock_fields"
+        "before_save": ["iwexclock.utils.decrypt_iwexclock_fields","iwexclock.utils.set_timing_details"]
     },
     "iWEXClock Reminder": {
         "before_insert": "iwexclock.utils.set_reminder_id",
