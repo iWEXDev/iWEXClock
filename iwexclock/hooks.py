@@ -52,7 +52,8 @@ fixtures = [
                 "ToDo-main-naming_rule",
                 "ToDo-main-subject_field",
                 "ToDo-main-show_title_field_in_link",
-                "ToDo-main-title_field"
+                "ToDo-main-title_field",
+                "ToDo-status-options"
             ]]
         ]
     }
