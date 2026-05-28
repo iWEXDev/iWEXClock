@@ -11,15 +11,15 @@
       "in_list_view": 1
     },
     {
-      "fieldname": "file_path",
-      "label": "File / URL",
-      "fieldtype": "Data",
-      "in_list_view": 1
-    },
-    {
       "fieldname": "duration",
       "label": "Duration (Second)",
       "fieldtype": "Int",
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "file_path",
+      "label": "File / URL",
+      "fieldtype": "Small Text",
       "in_list_view": 1
     }
   ]

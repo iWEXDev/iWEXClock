@@ -38,11 +38,12 @@
   "app_name",
   "app_type",
   "column_break_erto",
-  "urlfile_name",
   "language",
   "column_break_mmlc",
   "battery",
   "internet",
+  "url_section",
+  "urlfile_name",
   "interaction_data_tab",
   "mouse",
   "mouse_hits",
@@ -191,7 +192,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Task Status",
-   "options": "\nOpen\nCompleted\nOn hold\nWorking"
+   "options": "\nOpen\nCompleted\nOn hold\nWorking\nPending Review\nOverdue\nTemplate\nCancelled"
   },
   {
    "fieldname": "column_break_jsac",
@@ -224,7 +225,7 @@
   },
   {
    "fieldname": "urlfile_name",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Url/File Name"
   },
   {
@@ -246,6 +247,11 @@
    "fieldtype": "Percent",
    "label": "Internet"
   },
+  {
+ "fieldname": "url_section",
+ "fieldtype": "Section Break",
+ "label": "URL Details"
+},
   {
    "fieldname": "interaction_data_tab",
    "fieldtype": "Tab Break",

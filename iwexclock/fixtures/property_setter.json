@@ -71,13 +71,13 @@
   "doctype_or_field": "DocType",
   "field_name": null,
   "is_system_generated": 0,
-  "modified": "2026-05-16 10:45:31.117625",
+  "modified": "2026-05-28 15:06:54.092579",
   "module": null,
   "name": "ToDo-main-autoname",
   "property": "autoname",
   "property_type": "Data",
   "row_name": null,
-  "value": "format:TD.{YY}.{MM}.{DD}.{####}"
+  "value": "format:TD{YY}{MM}{DD}{####}"
  },
  {
   "default_value": "Open",
