@@ -56,6 +56,12 @@ fixtures = [
                 "ToDo-status-options"
             ]]
         ]
+    },
+    {
+        "doctype": "Print Format",
+        "filters": [
+            ["name", "=", "iWEXClock Report"]
+        ]
     }
 ]
 scheduler_events = {
