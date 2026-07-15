@@ -1,5 +1,7 @@
 const IWEXCLOCK_TREE_METHOD =
 	"iwexclock.iwexclock.report.iwexclock_summary.iwexclock_summary.get_tree_data";
+const IWEXCLOCK_PIVOT_METHOD =
+	"iwexclock.iwexclock.report.iwexclock_summary.iwexclock_summary.get_project_month_pivot";
 const IWEXCLOCK_TREE_INITIAL_EXPAND_DEPTH = 1;
 
 let iwexclock_active_report = null;
@@ -21,6 +23,52 @@ let iwexclock_tree_state = {
 // see iwexclock_sync_dates_to_period() for why this is needed.
 let iwexclock_syncing_dates = false;
 
+// Drives the Expand All / Collapse All toggle button. false renders every
+// node at its normal default depth (IWEXCLOCK_TREE_INITIAL_EXPAND_DEPTH) —
+// the same state the tree is in on first load — true forces every node open
+// regardless of depth. There's no third "collapse everything" state: clicking
+// Collapse All puts the tree back to the default (partially expanded) state,
+// not fully closed.
+let iwexclock_tree_all_expanded = false;
+let iwexclock_expand_all_btn = null;
+
+// frappe.Chart instance backing the chart above the pivot table. Tracked
+// only so its container can be safely re-rendered on every pivot refresh or
+// graph-type change (frappe.Chart has no destroy() — see
+// iwexclock_render_pivot_chart).
+let iwexclock_pivot_chart = null;
+
+// User's current graph-type pick from the toolbar selector (see onload()).
+// Persists across refreshes within the session, same as Sort By and Expand
+// All state, so switching filters doesn't silently reset it back to Bar.
+let iwexclock_pivot_chart_type = "Bar"; // "Bar" | "Line" | "Pie"
+
+// Last months/projects arrays rendered into the pivot (see
+// iwexclock_render_pivot_table). Cached so the graph-type selector can
+// re-render the chart instantly from data already on the client instead of
+// re-fetching from the server, same principle as Sort By re-deriving the
+// tree from iwexclock_tree_raw_data.
+let iwexclock_pivot_months = [];
+let iwexclock_pivot_projects = [];
+
+// Fixed category order for the pivot chart's project series, reused from
+// Frappe's own named chart palette (see user_profile_controller.js) rather
+// than inventing new colors — projects are assigned hues in this order and
+// never cycled based on filter state, so a given project keeps its color
+// across refreshes as long as it stays within the first 10.
+const IWEXCLOCK_CHART_COLORS = [
+	"blue",
+	"green",
+	"orange",
+	"red",
+	"purple",
+	"cyan",
+	"yellow",
+	"pink",
+	"light-blue",
+	"grey",
+];
+
 frappe.query_reports["iWEXClock Summary"] = {
 	filters: [
 		{
@@ -33,6 +81,14 @@ frappe.query_reports["iWEXClock Summary"] = {
 			fieldname: "to_date",
 			label: "To Date",
 			fieldtype: "Date",
+		},
+		{
+			fieldname: "period",
+			label: "Period",
+			fieldtype: "Select",
+			options: "Daily\nWeekly\nMonthly",
+			default: "Daily",
+			on_change: (report) => iwexclock_sync_dates_to_period(report),
 		},
 		{
 			fieldname: "user",
@@ -68,14 +124,6 @@ frappe.query_reports["iWEXClock Summary"] = {
 			options: "ToDo",
 			get_query: () => iwexclock_link_query("todo"),
 		},
-		{
-			fieldname: "period",
-			label: "Period",
-			fieldtype: "Select",
-			options: "Daily\nWeekly\nMonthly",
-			default: "Daily",
-			on_change: (report) => iwexclock_sync_dates_to_period(report),
-		},
 	],
 
 	onload(report) {
@@ -87,10 +135,24 @@ frappe.query_reports["iWEXClock Summary"] = {
 		// enabled/disabled state to match the default Period ("Daily"). This
 		// is UI-only (no data fetch), unlike the full iwexclock_sync_dates_to_period().
 		iwexclock_apply_period_ui(report);
-		// Query Reports don't get a built-in "Clear Filters" button the way
-		// List Views do, and manually clearing 8 fields one by one is tedious
-		// — add one to the "..." menu.
-		report.page.add_menu_item(__("Clear Filters"), () => iwexclock_clear_all_filters(report));
+		iwexclock_add_chart_type_selector(report);
+		// add_button() (as opposed to add_inner_button() or add_menu_item())
+		// drops the button into custom-actions, which sits immediately left of
+		// the standard Actions button in the page toolbar — i.e. right next to
+		// it, not buried inside its "..." dropdown menu.
+		report.page.add_button(__("Clear Filters"), () => iwexclock_clear_all_filters(report), {
+			icon: "filter",
+		});
+		iwexclock_expand_all_btn = report.page.add_button(
+			__("Expand All"),
+			() => iwexclock_toggle_expand_all(report),
+			{ icon: "expand" }
+		);
+		// iwexclock_tree_all_expanded (like Sort By's state) persists across
+		// re-opens of this report within the same session — sync the freshly
+		// (re)created button's label/icon to whatever it's already set to
+		// rather than forcing it back to collapsed.
+		iwexclock_update_expand_all_button();
 	},
 
 	after_datatable_render() {
@@ -232,6 +294,38 @@ async function iwexclock_clear_all_filters(report) {
 	report.refresh(true);
 }
 
+// Bar/Line/Pie selector for the chart above the pivot table, placed to the
+// left of Clear Filters. report.page.add_field()'s container (page_form) is
+// a separate row in the page body, not the toolbar (custom-actions) that
+// add_button() uses — so a Select field can't be positioned relative to
+// Clear Filters that way. Building a plain <select> directly inside
+// custom_actions (the same container add_button() appends to) and
+// prepending it before Clear Filters is added keeps it to the left, and
+// matches add_select()'s own approach of using a raw <select> rather than a
+// full frappe.ui.form control for a toolbar-level dropdown.
+function iwexclock_add_chart_type_selector(report) {
+	if (report.page.custom_actions.find(".iwexclock-chart-type-select").length) return;
+
+	const $select = $(`
+		<select class="form-control input-xs iwexclock-chart-type-select" title="${__("Graph Type")}">
+			<option value="Bar">${__("Bar")}</option>
+			<option value="Line">${__("Line")}</option>
+			<option value="Pie">${__("Pie")}</option>
+		</select>
+	`).prependTo(report.page.custom_actions);
+	report.page.custom_actions.removeClass("hide");
+
+	$select.val(iwexclock_pivot_chart_type).on("change", () => {
+		iwexclock_pivot_chart_type = $select.val();
+		const $container = iwexclock_get_tree_container(report);
+		iwexclock_render_pivot_chart(
+			iwexclock_pivot_months,
+			iwexclock_pivot_projects,
+			$container.find("#iwexclock-pivot-table")
+		);
+	});
+}
+
 function iwexclock_get_tree_container(report) {
 	// query_report.js calls this.$report.show() unconditionally right after
 	// render_datatable() on every refresh, so a plain .hide() call here always
@@ -248,13 +342,28 @@ function iwexclock_get_tree_container(report) {
 	// The toolbar (Sort By) is built once and left alone on subsequent
 	// refreshes so its controls aren't reset every time the top filters
 	// change. Only the #iwexclock-tree-body div underneath gets rewritten
-	// per refresh.
+	// per refresh. iwexclock_get_pivot_table() is created after the toolbar
+	// but prepends itself, so on first build it ends up above the toolbar
+	// (pivot table, then toolbar, then tree body) — see that function.
 	iwexclock_get_tree_toolbar($container);
+	iwexclock_get_pivot_table($container);
 	if (!$container.find("#iwexclock-tree-body").length) {
 		$container.append('<div id="iwexclock-tree-body"></div>');
 	}
 
 	return $container;
+}
+
+// Project x Month pivot table, shown above Sort By. Built once (like the
+// toolbar) and left alone on subsequent refreshes — only its contents are
+// rewritten per refresh, by iwexclock_render_pivot_table().
+function iwexclock_get_pivot_table($container) {
+	let $pivot = $container.find("#iwexclock-pivot-table");
+	if ($pivot.length) return $pivot;
+
+	$pivot = $('<div id="iwexclock-pivot-table"></div>');
+	$container.prepend($pivot);
+	return $pivot;
 }
 
 function iwexclock_get_tree_toolbar($container) {
@@ -300,9 +409,30 @@ function iwexclock_get_tree_toolbar($container) {
 	return $toolbar;
 }
 
+// Toggles between forcing every node open ("Expand All") and the default
+// depth-based render ("Collapse All" reverts to it — see
+// iwexclock_tree_all_expanded above). Re-renders from the already-cached raw
+// data, same as Sort By, so this doesn't hit the server.
+function iwexclock_toggle_expand_all(report) {
+	iwexclock_tree_all_expanded = !iwexclock_tree_all_expanded;
+	iwexclock_update_expand_all_button();
+
+	const $container = iwexclock_get_tree_container(report);
+	iwexclock_render_tree_from_state($container.find("#iwexclock-tree-body"));
+}
+
+function iwexclock_update_expand_all_button() {
+	if (!iwexclock_expand_all_btn) return;
+
+	const label = iwexclock_tree_all_expanded ? __("Collapse All") : __("Expand All");
+	const icon = iwexclock_tree_all_expanded ? "collapse" : "expand";
+	iwexclock_expand_all_btn.html(`${frappe.utils.icon(icon)} ${label}`);
+}
+
 function iwexclock_refresh_tree(report) {
 	const $container = iwexclock_get_tree_container(report);
 	const $body = $container.find("#iwexclock-tree-body");
+	const $pivot = $container.find("#iwexclock-pivot-table");
 	// Neither date filter is mandatory (see the filters array above) — with
 	// both empty, get_conditions() in the .py file simply adds no date
 	// condition at all, so this fetches all data unfiltered by date, same as
@@ -310,6 +440,7 @@ function iwexclock_refresh_tree(report) {
 	const filters = report.get_filter_values();
 
 	$body.html(`<div class="text-muted iwexclock-tree-loading">${__("Loading")}...</div>`);
+	$pivot.html(`<div class="text-muted iwexclock-tree-loading">${__("Loading")}...</div>`);
 
 	frappe.call({
 		method: IWEXCLOCK_TREE_METHOD,
@@ -319,6 +450,129 @@ function iwexclock_refresh_tree(report) {
 			iwexclock_render_tree_from_state($body);
 		},
 	});
+
+	// Separate call (rather than piggybacking on get_tree_data's response)
+	// since the pivot is grouped Project x Month only, independent of the
+	// Project -> Task -> Todo -> User -> Period tree shape and of the Period
+	// filter's Daily/Weekly/Monthly bucketing.
+	frappe.call({
+		method: IWEXCLOCK_PIVOT_METHOD,
+		args: { filters },
+		callback: (r) => {
+			iwexclock_render_pivot_table(r.message || {}, $pivot);
+		},
+	});
+}
+
+function iwexclock_render_pivot_table(data, $pivot) {
+	const months = data.months || [];
+	const projects = data.projects || [];
+
+	if (!months.length || !projects.length) {
+		iwexclock_pivot_months = [];
+		iwexclock_pivot_projects = [];
+		$pivot.html(`<div class="text-muted iwexclock-tree-empty">${__("No Data")}</div>`);
+		return;
+	}
+
+	const month_headers = months
+		.map((m) => `<th>${frappe.utils.escape_html(m.label)}</th>`)
+		.join("");
+
+	const project_rows = projects
+		.map((p) => {
+			const cells = p.hours.map((h) => `<td>${Number(h).toFixed(2)}</td>`).join("");
+			return `
+				<tr>
+					<td class="iwexclock-pivot-row-label">${frappe.utils.escape_html(p.label)}</td>
+					${cells}
+					<td class="iwexclock-pivot-total-col">${Number(p.total_hours).toFixed(2)}</td>
+				</tr>`;
+		})
+		.join("");
+
+	const month_total_cells = (data.month_totals || [])
+		.map((h) => `<td>${Number(h).toFixed(2)}</td>`)
+		.join("");
+
+	$pivot.html(`
+		<div id="iwexclock-pivot-chart"></div>
+		<table class="iwexclock-pivot-table">
+			<thead>
+				<tr>
+					<th class="iwexclock-pivot-corner">${__("Project")}</th>
+					${month_headers}
+					<th class="iwexclock-pivot-total-col">${__("Total")}</th>
+				</tr>
+			</thead>
+			<tbody>
+				${project_rows}
+				<tr class="iwexclock-pivot-totals-row">
+					<td class="iwexclock-pivot-row-label">${__("Total Hrs")}</td>
+					${month_total_cells}
+					<td class="iwexclock-pivot-total-col">${Number(data.grand_total || 0).toFixed(2)}</td>
+				</tr>
+			</tbody>
+		</table>
+	`);
+
+	// Cached so the toolbar's chart-type selector (see
+	// iwexclock_add_chart_type_selector) can re-render the chart on its own,
+	// without a server round-trip, the same way Sort By re-derives the tree
+	// from iwexclock_tree_raw_data.
+	iwexclock_pivot_months = months;
+	iwexclock_pivot_projects = projects;
+	iwexclock_render_pivot_chart(months, projects, $pivot);
+}
+
+// Chart above the pivot table, in whichever type the toolbar selector is
+// currently set to (see iwexclock_pivot_chart_type / iwexclock_add_chart_type_selector).
+// Bar and Line both plot every project across every month, straight from the
+// same months/projects arrays the table renders from, so the chart and table
+// can never disagree. Pie has no time axis, so it instead plots each
+// project's total_hours — the one number a pie can meaningfully show.
+function iwexclock_render_pivot_chart(months, projects, $pivot) {
+	const $chart_container = $pivot.find("#iwexclock-pivot-chart");
+	if (!$chart_container.length) return;
+
+	const tooltip_hours = { formatTooltipY: (value) => `${Number(value).toFixed(2)} ${__("hrs")}` };
+
+	let options;
+	if (iwexclock_pivot_chart_type === "Pie") {
+		options = {
+			type: "pie",
+			height: 240,
+			colors: IWEXCLOCK_CHART_COLORS,
+			tooltipOptions: tooltip_hours,
+			data: {
+				labels: projects.map((p) => p.label),
+				datasets: [{ values: projects.map((p) => p.total_hours) }],
+			},
+		};
+	} else {
+		options = {
+			type: iwexclock_pivot_chart_type === "Line" ? "line" : "bar",
+			height: 240,
+			colors: IWEXCLOCK_CHART_COLORS,
+			barOptions: { stacked: 1, spaceRatio: 0.3 },
+			axisOptions: {
+				shortenYAxisNumbers: 1,
+				numberFormatter: frappe.utils.format_chart_axis_number,
+			},
+			tooltipOptions: tooltip_hours,
+			data: {
+				labels: months.map((m) => m.label),
+				datasets: projects.map((p) => ({ name: p.label, values: p.hours })),
+			},
+		};
+	}
+
+	// frappe.Chart has no destroy(); the container is either fresh (initial
+	// render, via $pivot.html() above) or about to have its chart swapped for
+	// a type change (selector's change handler) — .empty() covers both so a
+	// stale instance never lingers underneath the new one.
+	$chart_container.empty();
+	iwexclock_pivot_chart = new frappe.Chart($chart_container[0], options);
 }
 
 // Re-derives the on-screen tree from the cached raw data plus whatever Sort
@@ -391,7 +645,7 @@ function iwexclock_render_tree(nodes, $body) {
 
 function iwexclock_render_node(node, depth) {
 	const has_children = node.children && node.children.length;
-	const expanded = depth < IWEXCLOCK_TREE_INITIAL_EXPAND_DEPTH;
+	const expanded = iwexclock_tree_all_expanded || depth < IWEXCLOCK_TREE_INITIAL_EXPAND_DEPTH;
 
 	const toggle_html = has_children
 		? `<span class="iwexclock-tree-toggle">${iwexclock_toggle_icon(node.field, expanded)}</span>`
@@ -461,6 +715,19 @@ function iwexclock_inject_tree_styles() {
 		.iwexclock-tree-hours { min-width: 70px; text-align: right; white-space: nowrap; }
 		.iwexclock-tree-sessions { min-width: 100px; text-align: right; white-space: nowrap; }
 		.iwexclock-tree-loading, .iwexclock-tree-empty { padding: 20px; text-align: center; }
+		#iwexclock-pivot-table { margin-bottom: 10px; }
+		#iwexclock-pivot-chart { margin-bottom: 14px; }
+		#iwexclock-pivot-chart .chart-container { padding: 0; }
+		.iwexclock-chart-type-select { width: auto; display: inline-block; height: 28px; margin-right: 6px; vertical-align: middle; }
+		#iwexclock-pivot-table table.iwexclock-pivot-table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid var(--border-color); border-radius: var(--border-radius); overflow: hidden; }
+		#iwexclock-pivot-table th, #iwexclock-pivot-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); text-align: right; white-space: nowrap; }
+		#iwexclock-pivot-table th:last-child, #iwexclock-pivot-table td:last-child { border-right: none; }
+		#iwexclock-pivot-table tbody tr:last-child th, #iwexclock-pivot-table tbody tr:last-child td { border-bottom: none; }
+		#iwexclock-pivot-table thead th { background: var(--bg-light-gray); font-weight: 600; }
+		#iwexclock-pivot-table th.iwexclock-pivot-corner, #iwexclock-pivot-table td.iwexclock-pivot-row-label { text-align: left; }
+		#iwexclock-pivot-table td.iwexclock-pivot-row-label { font-weight: 500; }
+		#iwexclock-pivot-table td.iwexclock-pivot-total-col, #iwexclock-pivot-table th.iwexclock-pivot-total-col { font-weight: 600; background: var(--bg-light-gray); }
+		#iwexclock-pivot-table tr.iwexclock-pivot-totals-row { font-weight: 600; background: var(--bg-light-gray); }
 	`;
 	document.head.appendChild(style);
 }

@@ -320,6 +320,65 @@ def format_label(node, period):
     return label
 
 
+@frappe.whitelist()
+def get_project_month_pivot(filters=None):
+    """Project x Month totals (in hours), for the pivot table rendered above Sort By
+    in iwexclock_summary.js. Always buckets by calendar month regardless of the
+    Period filter (Daily/Weekly/Monthly) — this table is a fixed month view — but
+    honours every other top filter the same way get_tree_data() does."""
+    filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
+    conditions, values = get_conditions(filters)
+
+    query = f"""
+        SELECT
+            project,
+            {MONTH_EXPR} AS month,
+            SUM(TIME_TO_SEC(duration)) AS total_seconds
+        FROM `tabiWEXClock Data`
+        WHERE work_status = 'Active'
+            AND duration IS NOT NULL AND duration != ''
+            {conditions}
+        GROUP BY project, month
+        ORDER BY project, month
+    """
+    rows = frappe.db.sql(query, values, as_dict=True)
+    project_customer_map = get_project_customer_map(rows)
+
+    months = sorted({row["month"] for row in rows if row["month"]})
+
+    projects_order = []
+    hours_by_project = {}
+    for row in rows:
+        project = row["project"]
+        if project not in hours_by_project:
+            hours_by_project[project] = {}
+            projects_order.append(project)
+        hours_by_project[project][row["month"]] = flt(row["total_seconds"] / 3600.0, 2)
+
+    def project_label(project):
+        node = {"field": "project", "raw_value": project, "customer": project_customer_map.get(project)}
+        return format_label(node, None)
+
+    month_totals = [0.0] * len(months)
+    grand_total = 0.0
+    projects = []
+    for project in sorted(projects_order, key=lambda p: project_label(p).lower()):
+        hours_by_month = hours_by_project[project]
+        hours = [flt(hours_by_month.get(m, 0.0), 2) for m in months]
+        total_hours = flt(sum(hours), 2)
+        for i, h in enumerate(hours):
+            month_totals[i] = flt(month_totals[i] + h, 2)
+        grand_total = flt(grand_total + total_hours, 2)
+        projects.append({"label": project_label(project), "hours": hours, "total_hours": total_hours})
+
+    return {
+        "months": [{"value": m, "label": format_month_label(m)} for m in months],
+        "projects": projects,
+        "month_totals": month_totals,
+        "grand_total": grand_total,
+    }
+
+
 def format_day_label(value):
     if not value:
         return _("(Unknown Date)")
